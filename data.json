@@ -1,0 +1,12 @@
+{
+    "compilingProperties": [
+        {
+        "levelName": "name",
+        "pathToData": "path",
+        "debugMode": false,
+        "printDebugInfo": true,
+        "replaceOldObjects": false,
+        "geode_integration": true
+        }
+    ]
+}
