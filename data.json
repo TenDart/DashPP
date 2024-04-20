@@ -1,7 +1,7 @@
 {
     "compilingProperties": [
         {
-        "levelName": "name",
+        "levelName": "ss",
         "pathToData": "path",
         "debugMode": false,
         "printDebugInfo": true,

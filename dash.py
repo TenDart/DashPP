@@ -7,8 +7,10 @@ import PIL.Image
 import win32clipboard
 import PIL
 import cv2
-
-
+from os import listdir
+from os.path import isfile, join
+from selenium import webdriver as wd
+from selenium.webdriver.common.by import By
 
 dataJson = open("data.json", "r")
 txt = dataJson.read()
@@ -24,7 +26,7 @@ if geode_integration == True:
 
 class Object:
     def __init__(self,objId: int, **kwargs):
-        self.index = __addObj(objId, **kwargs)
+        self.index = addObj(objId, **kwargs)
     def addGroups(self, group_list: list):
         global objectsList, __groupList
         if __isObjectHasGroups(objectsList[self.index]) == False:
@@ -119,7 +121,7 @@ def start():
         __oldLevelString = __decodedLevel
         __decodedLevel = __decode_level(__decodedLevel, False)
 
-def __addObj(obj_id: int, **kwargs) -> int: # this func is PARENT of all functions that spawn groups, so it's like a "manager". Returns index of object in the object list
+def addObj(obj_id: int, **kwargs) -> int: # this func is PARENT of all functions that spawn groups, so it's like a "manager". Returns index of object in the object list
     global objectsList, __objectsString
     objectString = f"1,{obj_id}"
     objectKeys = open("objectKeys.txt", "r")
@@ -382,9 +384,38 @@ def geometrizeToGd(filePath: str, xPos_ = 0, yPos_ = 0):
                 ).setColor(hsvColors[0],hsvColors[1],hsvColors[2])
 
 
+def __getFilesInFolder(folderPath: str) -> list: 
+     return [f for f in listdir(folderPath) if isfile(join(folderPath, f))]
+
+def __getFrame(sec, vidcap, count):
+    vidcap.set(cv2.CAP_PROP_POS_MSEC,sec*1000)
+    hasFrames,image = vidcap.read()
+    if hasFrames:
+        cv2.imwrite("image"+str(count)+".jpg", image)     # save frame as JPG file
+    return hasFrames
+
+def __cutVideoToFrames(inputFilePath: str, outputFolderPath: str):
+    vidcap = cv2.VideoCapture(inputFilePath)
+    sec = 0
+    frameRate = 0.033 #//it will capture image in each 0.5 second
+    count=1
+    success = __getFrame(sec, vidcap, count)
+    while success:
+        count = count + 1
+        sec = sec + frameRate
+        sec = round(sec, 2)
+        success = __getFrame(sec, vidcap, count)
+
+def videoToJson(pathToVideo: str, outputFolder: str, ):
+    print("")
+def jsonToGD(pathToJsonFolder: str):
+    jsonFilesStr = __getFilesInFolder(pathToJsonFolder)
+    for fileStr in jsonFilesStr:
+        geometrizeToGd(f"{pathToJsonFolder}\{fileStr}")
 def __modifyFile(dataToReplace: str, oldLevelString: str, newObjList: list):
     global __rawDataFile, debug_mode, replaceOldObjects
     newDecodedObjString = ""
+
     for objStr in newObjList:
         newDecodedObjString += objStr + ";"
     if geode_integration == False:
