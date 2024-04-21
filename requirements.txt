@@ -1,0 +1,4 @@
+pillow==10.3.0
+pywin32==306
+opencv-python==4.9.0.80
+selenium==4.19.0

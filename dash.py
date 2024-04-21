@@ -382,7 +382,7 @@ def geometrizeToGd(filePath: str, xPos_ = 0, yPos_ = 0):
                 rotation = data[4]*(-1),
                 zOrder = Z
                 ).setColor(hsvColors[0],hsvColors[1],hsvColors[2])
-
+            
 
 def __modifyFile(dataToReplace: str, oldLevelString: str, newObjList: list):
     global __rawDataFile, debug_mode, replaceOldObjects
