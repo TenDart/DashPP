@@ -1,8 +1,8 @@
 {
     "compilingProperties": [
         {
-        "levelName": "testingDashPP",
-        "pathToData": "C:/Users/levkr/AppData/Local/GeometryDash/CCLocalLevels.dat",
+        "levelName": "nameOfLevel",
+        "pathToData": "path/to/CCLocalLevels.dat",
         "debugMode": false,
         "printDebugInfo": true,
         "replaceOldObjects": false,

@@ -11,6 +11,10 @@ from os import listdir
 from os.path import isfile, join
 from selenium import webdriver as wd
 from selenium.webdriver.common.by import By
+import glob
+import os
+import time
+import pathlib
 
 dataJson = open("data.json", "r")
 txt = dataJson.read()
@@ -28,8 +32,8 @@ class Object:
     def __init__(self,objId: int, **kwargs):
         self.index = addObj(objId, **kwargs)
     def addGroups(self, group_list: list):
-        global objectsList, __groupList
-        if __isObjectHasGroups(objectsList[self.index]) == False:
+        global objectsList, groupList
+        if isObjectHasGroups(objectsList[self.index]) == False:
             objectsList[self.index] += ",57,"
         iterationCount = 0
         for group in group_list:
@@ -45,7 +49,7 @@ class Object:
                     objectsList[self.index] += "." + str(group)
                 else:
                     objectsList[self.index] += str(group)
-                __groupList.append(group)
+                groupList.append(group)
     def setColor(self, h: float, s: float, v: float):
         objectsList[self.index] += f",41,1,43,{h}a{s}a{v}a1a0"
 
@@ -81,7 +85,6 @@ def __decode_level(level_data: str, is_official_level: bool) -> str:
     if is_official_level:
         level_data = 'H4sIAAAAAAAAA' + level_data
     base64_decoded = base64.urlsafe_b64decode(level_data.encode())
-    # window_bits = 15 | 32 will autodetect gzip or not
     decompressed = zlib.decompress(base64_decoded, 15 | 32)
     return decompressed.decode()
 
@@ -101,7 +104,7 @@ __rawDataFile = None
 __objectsString = ""
 __oldLevelString = ""
 __oldDataString = ""
-__groupList = []
+groupList = []
 
 def getLevelString():
     global __rawDataString, __rawDataFile
@@ -297,19 +300,19 @@ def __getKeysOfObject(obj: str) -> list:
             objectKeys.append(splittedObj[keyOrProp])
     return objectKeys
 
-def __isObjectHasGroups(obj: str) -> bool:
+def isObjectHasGroups(obj: str) -> bool:
     groups = __getKeysOfObject(obj)
     return groups.count("57")
 
 def nextFreeGroup() -> int:
-    global __groupList
-    if len(__groupList) == 0:
-        __groupList.append(1)
+    global groupList
+    if len(groupList) == 0:
+        groupList.append(1)
         return 1
     else:
         for i in range(9999):
-            if i not in __groupList and i > 0:
-                __groupList.append(i)
+            if i not in groupList and i > 0:
+                groupList.append(i)
                 return i
 
 def rgbToHSV(r:int,g:int,b:int) -> list:
@@ -382,7 +385,85 @@ def geometrizeToGd(filePath: str, xPos_ = 0, yPos_ = 0):
                 rotation = data[4]*(-1),
                 zOrder = Z
                 ).setColor(hsvColors[0],hsvColors[1],hsvColors[2])
-            
+
+
+def getVertexesFromObjFile(filePath) -> list: #returns list of vertexes
+    file = open(filePath)
+    vertexList = []
+    for lines in file.readlines():
+        if lines[0:2] == "v ":
+            vertexList.append(lines[2:].rstrip("\n").split(" "))
+    return vertexList
+
+def __getFilesInFolder(folderPath: str) -> list: 
+    files = list(filter(os.path.isfile, glob.glob(folderPath + "*")))
+    files.sort(key=lambda x: os.path.getmtime(x))
+    newFiles = []
+    for file in files:
+        newFiles.append(files[files.index(file)][files[files.index(file)].rfind("\\")+1:])
+    return newFiles
+     #return [f for f in listdir(folderPath) if isfile(join(folderPath, f))]
+
+def __getFrame(sec, vidcap, count, outputFolderPath):
+    vidcap.set(cv2.CAP_PROP_POS_MSEC,sec*1000)
+    hasFrames,image = vidcap.read()
+    if hasFrames:
+        cv2.imwrite(outputFolderPath + "image"+str(count)+".jpg", image)     # save frame as JPG file
+    return hasFrames
+
+def cutVideoToImageSequence(inputFilePath: str,fps: int, outputFolderName = "imageSequence/" ):
+    vidcap = cv2.VideoCapture(inputFilePath)
+    sec = 0
+    frameRate = 1/fps
+    count=1
+    os.makedirs(f"videoToGD/{outputFolderName}")
+    success = __getFrame(sec, vidcap, count, f"videoToGD/{outputFolderName}")
+    while success:
+        count = count + 1
+        sec = sec + frameRate
+        sec = round(sec, 2)
+        success = __getFrame(sec, vidcap, count, f"videoToGD/{outputFolderName}")
+
+def convertImageSequenceToJson(objectSize:int, pathToImageSequence = "videoToGD/imageSequence/", outputFolderName = "jsonSequence"):
+    options = wd.ChromeOptions()
+    os.makedirs(f"videoToGD/{outputFolderName}")
+    options.add_argument('--no-sandbox')
+    preferences = {"download.default_directory": str(pathlib.Path().resolve()) +f"\\"[0] + f"videoToGD\{outputFolderName}"}
+    options.add_experimental_option("prefs", preferences)
+    url = "https://www.samcodes.co.uk/project/geometrize-haxe-web/"
+    driver = wd.Chrome(options= options)
+    driver.get(url)
+    #start()
+    driver.implicitly_wait(15)
+    driver.find_element( By.XPATH, '/html/body/section[2]/div/h2/label' ).click()
+    fileSequence = __getFilesInFolder(pathToImageSequence)
+    for i in range(len(fileSequence)-1):
+            driver.find_element(By.ID, "openimageinput").send_keys(str(pathlib.Path().resolve()) +f"\\"[0] + pathToImageSequence+fileSequence[i])
+            if i == 0:
+                driver.find_element(By.ID, "resetbutton").click()
+                #driver.find_element(By.ID, "runpausebutton").click()
+            else:
+                print("")
+            while True:
+                if driver.find_element(By.ID, "shapesaddedtext").text != "":
+                    if int(driver.find_element(By.ID, "shapesaddedtext").text) > objectSize:
+                        print("huh")
+                        driver.find_element(By.ID, "savejsonbutton").click()
+                        break
+    time.sleep(10)
+    driver.close()
+
+def jsonToGD(pathToJsonFolder = str(pathlib.Path().resolve()).replace("\\"[0], "/") + "/" + f"videoToGD/jsonSequence/"):
+    jsonFilesStr = __getFilesInFolder(pathToJsonFolder)
+    count = 0
+    debugLog(pathToJsonFolder)
+    for fileStr in jsonFilesStr:
+        count += 1
+        geometrizeToGd(f"{pathToJsonFolder}/{fileStr}", xPos_ = count * 2000)
+        debugLog(f"{pathToJsonFolder}/{fileStr}")
+
+def convertVideoToGD(filePath, frameRate: int):
+    cutVideoToImageSequence(filePath,frameRate, )
 
 def __modifyFile(dataToReplace: str, oldLevelString: str, newObjList: list):
     global __rawDataFile, debug_mode, replaceOldObjects

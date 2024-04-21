@@ -1,3 +1,7 @@
 
 main.py
 web.py
+/videoToGD
+*.mtl
+*.obj
+*.mp4
