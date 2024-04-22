@@ -15,6 +15,7 @@ import glob
 import os
 import time
 import pathlib
+import shutil
 
 dataJson = open("data.json", "r")
 txt = dataJson.read()
@@ -30,6 +31,7 @@ if geode_integration == True:
 
 class Object:
     def __init__(self,objId: int, **kwargs):
+        assert objId > 0
         self.index = addObj(objId, **kwargs)
     def addGroups(self, group_list: list):
         global objectsList, groupList
@@ -402,7 +404,6 @@ def __getFilesInFolder(folderPath: str) -> list:
     for file in files:
         newFiles.append(files[files.index(file)][files[files.index(file)].rfind("\\")+1:])
     return newFiles
-     #return [f for f in listdir(folderPath) if isfile(join(folderPath, f))]
 
 def __getFrame(sec, vidcap, count, outputFolderPath):
     vidcap.set(cv2.CAP_PROP_POS_MSEC,sec*1000)
@@ -416,6 +417,8 @@ def cutVideoToImageSequence(inputFilePath: str,fps: int, outputFolderName = "ima
     sec = 0
     frameRate = 1/fps
     count=1
+    if os.path.isdir(f"videoToGD/{outputFolderName}") == True:
+        shutil.rmtree(f"videoToGD/{outputFolderName}/")
     os.makedirs(f"videoToGD/{outputFolderName}")
     success = __getFrame(sec, vidcap, count, f"videoToGD/{outputFolderName}")
     while success:
@@ -423,12 +426,16 @@ def cutVideoToImageSequence(inputFilePath: str,fps: int, outputFolderName = "ima
         sec = sec + frameRate
         sec = round(sec, 2)
         success = __getFrame(sec, vidcap, count, f"videoToGD/{outputFolderName}")
+    debugLog(f"Succesfully cut to {len(__getFilesInFolder(f"videoToGD/{outputFolderName}"))-1} files")
 
 def convertImageSequenceToJson(objectSize:int, pathToImageSequence = "videoToGD/imageSequence/", outputFolderName = "jsonSequence"):
     options = wd.ChromeOptions()
+    if os.path.isdir(f"videoToGD/{outputFolderName}") == True:
+        shutil.rmtree(f"videoToGD/{outputFolderName}/")
     os.makedirs(f"videoToGD/{outputFolderName}")
     options.add_argument('--no-sandbox')
-    preferences = {"download.default_directory": str(pathlib.Path().resolve()) +f"\\"[0] + f"videoToGD\{outputFolderName}"}
+    options.add_argument('--headless=new')
+    preferences = {"download.default_directory": str(pathlib.Path().resolve()) +f"\\"[0] + f"videoToGD" + f"\\"[0] + outputFolderName}
     options.add_experimental_option("prefs", preferences)
     url = "https://www.samcodes.co.uk/project/geometrize-haxe-web/"
     driver = wd.Chrome(options= options)
@@ -437,33 +444,27 @@ def convertImageSequenceToJson(objectSize:int, pathToImageSequence = "videoToGD/
     driver.implicitly_wait(15)
     driver.find_element( By.XPATH, '/html/body/section[2]/div/h2/label' ).click()
     fileSequence = __getFilesInFolder(pathToImageSequence)
+    debugLog(f"Files to convert: {len(fileSequence)-1}")
     for i in range(len(fileSequence)-1):
             driver.find_element(By.ID, "openimageinput").send_keys(str(pathlib.Path().resolve()) +f"\\"[0] + pathToImageSequence+fileSequence[i])
             if i == 0:
                 driver.find_element(By.ID, "resetbutton").click()
-                #driver.find_element(By.ID, "runpausebutton").click()
-            else:
-                print("")
             while True:
                 if driver.find_element(By.ID, "shapesaddedtext").text != "":
                     if int(driver.find_element(By.ID, "shapesaddedtext").text) > objectSize:
-                        print("huh")
                         driver.find_element(By.ID, "savejsonbutton").click()
                         break
+            debugLog(f"File {i+1} is converted. Remain: {len(fileSequence)-1} files.")
+    debugLog(f"Succesfully converted {len(fileSequence)-1} files to {pathToImageSequence}")
     time.sleep(10)
     driver.close()
 
-def jsonToGD(pathToJsonFolder = str(pathlib.Path().resolve()).replace("\\"[0], "/") + "/" + f"videoToGD/jsonSequence/"):
+def jsonSequenceToGD(pathToJsonFolder = str(pathlib.Path().resolve()).replace("\\"[0], "/") + "/" + f"videoToGD/jsonSequence/"):
     jsonFilesStr = __getFilesInFolder(pathToJsonFolder)
     count = 0
-    debugLog(pathToJsonFolder)
     for fileStr in jsonFilesStr:
         count += 1
         geometrizeToGd(f"{pathToJsonFolder}/{fileStr}", xPos_ = count * 2000)
-        debugLog(f"{pathToJsonFolder}/{fileStr}")
-
-def convertVideoToGD(filePath, frameRate: int):
-    cutVideoToImageSequence(filePath,frameRate, )
 
 def __modifyFile(dataToReplace: str, oldLevelString: str, newObjList: list):
     global __rawDataFile, debug_mode, replaceOldObjects
